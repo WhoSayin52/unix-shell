@@ -1,0 +1,16 @@
+{
+	"version": 10,
+	"configurePresets": [
+		{
+			"name": "default",
+			"displayName": "gcc Ninja Multi-Config",
+			"generator": "Ninja Multi-Config",
+			"binaryDir": "${sourceDir}/build",
+			"cacheVariables": {
+				"CMAKE_C_FLAGS": "-pedantic-errors -Wall -Wextra -Wconversion -Wsign-conversion -Werror",
+				"CMAKE_C_FLAGS_DEBUG": "-O0 -ggdb",
+				"CMAKE_C_FLAGS_RELEASE": "-O2 -DNDEBUG"
+			}
+		}
+	]
+}
