@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <limits.h>
 
 #define PATHS_SIZE 50
 #define MAX_PATH_SIZE 256
@@ -22,13 +23,15 @@ struct built_in_fn_info {
 static ArrayString paths;
 
 void path(char* argv[]);
+void cd(char* argv[]);
 void my_exit(char* argv[]);
 
 int find_built_in_fn(char* command);
 
 struct built_in_fn_info built_in_functions[] = {
-	{ "exit", &my_exit },
-	{ "path", &path }
+	{ "path", &path },
+	{ "cd", &cd },
+	{ "exit", &my_exit }
 };
 
 bool init_paths() {
@@ -77,10 +80,26 @@ bool execute_commnad(ArrayString* args) {
 		strcpy(full_path, paths.array[i]);
 		strcat(full_path, argv[0]);
 
-		int rc = access(full_path, X_OK);
+		int rc_access = access(full_path, X_OK);
 
-		if (rc == 0) {
-			printf("WRITE EXE CODE\n");
+		if (rc_access == 0) {
+#ifndef NDEBUG
+
+			printf("External program to run: %s\n", full_path);
+
+#endif //NDEBUG
+
+			int rc_fork = fork();
+			if (rc_fork == -1) {
+				return false;
+			}
+
+			if (rc_fork == 0) {
+				execv(full_path, argv);
+				print_err();
+				exit(1);
+			}
+
 			return true;
 		}
 	}
@@ -176,6 +195,43 @@ void path(char* argv[]) {
 		printf("%s: ", paths.array[j]);
 	}
 	printf("\n");
+
+#endif //NDEBUG
+}
+
+void cd(char* argv[]) {
+
+	char* path = argv[0];
+	if (path == NULL) {
+		print_err();
+		return;
+	}
+
+	if (argv[1] != NULL) {
+		print_err();
+		return;
+	}
+
+#ifndef NDEBUG
+
+	printf("New dir path: %s\n", path);
+
+#endif //NDEBUG
+
+	int rc = chdir(path);
+
+	if (rc != 0) {
+		print_err();
+		return;
+	}
+
+#ifndef NDEBUG
+
+	char cwd[PATH_MAX];
+
+	if (getcwd(cwd, sizeof(cwd)) != NULL) {
+		printf("Current working directory: %s\n", cwd);
+	}
 
 #endif //NDEBUG
 }

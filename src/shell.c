@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
+#include <errno.h>
+#include <sys/wait.h>
 
 #define INPUT_BUFFER 4096
 #define MAX_ARGS 50
@@ -143,6 +145,15 @@ static void process_input(char* input) {
 		if (execute_commnad(&args) == false) {
 			print_err();
 			continue;
+		}
+	}
+
+	errno = 0;
+	while (true) {
+		if (wait(NULL) == -1) {
+			if (errno == ECHILD) {
+				break;
+			}
 		}
 	}
 }
