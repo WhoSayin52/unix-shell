@@ -58,11 +58,11 @@ void destroy_paths() {
 
 bool execute_commnad(ArrayString* args) {
 
-	char** argv = args->array;
-
-	if (args->size == 1) {
+	if (args->size == 0) {
 		return false;
 	}
+
+	char** argv = args->array;
 
 	int built_in_index = find_built_in_fn(argv[0]);
 	if (built_in_index >= 0) {
@@ -102,37 +102,82 @@ int find_built_in_fn(char* command) {
 
 void path(char* argv[]) {
 
-	/*
-	for (int j = 0; j < paths.capacity; ++j) {
-		if (paths.array[j] == NULL) {
-			printf("%d- NULL\n", j);
-		}
+#ifndef NDEBUG
+
+	int index = 0;
+	char* word = argv[index];
+	printf("NEW PATHS ARGV: ");
+	while (word != NULL) {
+		printf("%s : ", word);
+		word = argv[++index];
 	}
-	*/
+	printf("\n");
+
+#endif //NDEBUG
 
 	int i = 0;
-	while (argv[i] != NULL && i < paths.capacity) {
+	while (i < paths.capacity) {
+		char* path = *argv;
 
-		char* new_path = strdup(argv[i]);
-		if (new_path == NULL) {
-			fprintf(stderr, "Could not allocate memory to new path for paths.\n");
-			if (i > paths.size) {
-				paths.size = i;
-			}
+		if (path == NULL) {
+			break;
+		}
+
+		++argv;
+
+		int path_len = (int)strlen(path);
+		if (path_len + 1 > MAX_PATH_SIZE) {
+			print_err();
+			continue;
+		}
+
+		path = strdup(path);
+
+		if (path == NULL) {
+			fprintf(stderr, "Could not allocate enought memory for a new path");
 			exit(1);
 		}
-		free(paths.array[i]);
-		paths.array[i] = new_path;
+
+		int rc = access(path, R_OK);
+		if (rc != 0) {
+			free(path);
+			print_err();
+			continue;
+		}
+
+#ifndef NDEBUG
+
+		printf("PATH: %s\n", path);
+
+#endif //NDEBUG
+
+		char* old_path = paths.array[i];
+		if (old_path != NULL) {
+			free(old_path);
+		}
+
+		paths.array[i] = path;
 		++i;
 	}
 
-	paths.size = i;
+	int new_size = i;
 
-	while (paths.array[i] != NULL && i < paths.capacity) {
+	while (i < paths.size) {
 		free(paths.array[i]);
-		paths.array[i] = NULL;
 		++i;
 	}
+
+	paths.size = new_size;
+
+#ifndef NDEBUG
+
+	printf("UPDATED PATHS: ");
+	for (int j = 0; j < paths.size; ++j) {
+		printf("%s: ", paths.array[j]);
+	}
+	printf("\n");
+
+#endif //NDEBUG
 }
 
 void my_exit(char* argv[]) {

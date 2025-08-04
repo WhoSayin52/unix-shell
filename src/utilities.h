@@ -11,6 +11,4 @@ typedef struct {
 
 void print_err();
 
-bool parse_command(char* input, ArrayString* args);
-
 #endif //UTILITIES_H
