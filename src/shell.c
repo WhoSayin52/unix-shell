@@ -15,6 +15,7 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <limits.h>
 
 #define INPUT_BUFFER 4096
 #define MAX_ARGS 50
@@ -105,7 +106,20 @@ static void interactive_mode() {
 }
 
 static void batch_mode(char* file_path) {
-	printf("%s\n", file_path);
+
+	FILE* batch_file = fopen(file_path, "r");
+	if (batch_file == NULL) {
+		print_err();
+		exit(1);
+	}
+
+	while (fgets(input, INPUT_BUFFER, batch_file) != NULL) {
+		process_input(input);
+	}
+
+	if (feof(batch_file) == 0) {
+		print_err();
+	}
 }
 
 static void process_input(char* input) {

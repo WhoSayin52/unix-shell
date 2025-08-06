@@ -6,6 +6,7 @@
 
 void print_err() {
 	char error_message[30] = "An error has occurred\n";
-	write(STDERR_FILENO, error_message, strlen(error_message));
+	int rc = (int)write(STDERR_FILENO, error_message, strlen(error_message));
+	(void)rc;
 }
 
