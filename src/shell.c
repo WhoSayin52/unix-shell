@@ -16,10 +16,13 @@
 #include <errno.h>
 #include <sys/wait.h>
 #include <limits.h>
+#include <fcntl.h>
 
 #define INPUT_BUFFER 4096
 #define MAX_ARGS 50
 
+static int stdout_fd;
+static int stderr_fd;
 static char* input = NULL;
 static ArrayString args;
 
@@ -30,6 +33,7 @@ static void batch_mode(char* file_path);
 
 static void process_input(char* input);
 static bool parse_sub_input();
+bool get_redirection(char* sub_input, char** output_dest);
 
 void shell_run(int argc, char* argv[]) {
 
@@ -77,6 +81,9 @@ static void init() {
 		free(input);
 		exit(1);
 	}
+
+	stdout_fd = dup(STDOUT_FILENO);
+	stderr_fd = dup(STDERR_FILENO);
 
 	atexit(destroy);
 }
@@ -139,6 +146,7 @@ static void process_input(char* input) {
 		return;
 	}
 
+	int redirection_fd = -1;
 	char* sub_input = NULL;
 
 	while ((sub_input = strsep(&input, "&")) != NULL) {
@@ -149,6 +157,46 @@ static void process_input(char* input) {
 		if (sub_input[0] == '\0') {
 			print_err();
 			continue;
+		}
+
+		if (redirection_fd != -1) {
+			int rc1 = dup2(stderr_fd, STDOUT_FILENO);
+			int rc2 = dup2(stdout_fd, STDERR_FILENO);
+
+			if (rc1 != 0 || rc2 != 0) {
+				print_err();
+				exit(1);
+			}
+
+			int rc3 = close(redirection_fd);
+			(void)rc3;
+		}
+
+		char* output_dest = NULL;
+		if (get_redirection(sub_input, &output_dest) == false) {
+			print_err();
+			continue;
+		}
+
+		if (output_dest != NULL) {
+			redirection_fd = open(
+				output_dest,
+				O_CREAT | O_TRUNC | O_WRONLY,
+				S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
+			);
+
+			if (redirection_fd == -1) {
+				print_err();
+				continue;
+			}
+
+			int rc1 = dup2(redirection_fd, STDOUT_FILENO);
+			int rc2 = dup2(redirection_fd, STDERR_FILENO);
+
+			if (rc1 == -1 || rc2 == -1) {
+				print_err();
+				exit(1);
+			}
 		}
 
 		if (parse_sub_input(&sub_input) == false) {
@@ -170,6 +218,20 @@ static void process_input(char* input) {
 			}
 		}
 	}
+
+	if (redirection_fd != -1) {
+		int rc1 = dup2(stdout_fd, STDOUT_FILENO);
+		int rc2 = dup2(stderr_fd, STDERR_FILENO);
+
+		if (rc1 == -1 || rc2 == -1) {
+			print_err();
+			exit(1);
+		}
+
+		int rc3 = close(redirection_fd);
+		(void)rc3;
+	}
+
 }
 
 static bool parse_sub_input(char** sub_input) {
@@ -200,6 +262,43 @@ static bool parse_sub_input(char** sub_input) {
 	}
 
 	args.array[args.size] = NULL;
+
+	return true;
+}
+
+bool get_redirection(char* sub_input, char** output_dest) {
+
+	*output_dest = NULL;
+
+	char* arg = strsep(&sub_input, ">");
+
+	if (sub_input == NULL) {
+		return true;
+	}
+
+	int count = 0;
+
+	while ((arg = strsep(&sub_input, " \t\n")) != NULL) {
+		if (arg[0] == '\0') {
+			continue;
+		}
+
+		*output_dest = arg;
+		++count;
+	}
+
+	if (count != 1) {
+		return false;
+	}
+
+	if (strchr(*output_dest, '>') != NULL) {
+		return false;
+	}
+
+	int path_len = (int)strlen(*output_dest);
+	if (path_len + 1 > PATH_MAX) {
+		return false;
+	}
 
 	return true;
 }
